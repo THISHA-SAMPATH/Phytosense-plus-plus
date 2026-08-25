@@ -1,18 +1,31 @@
 #include <Arduino.h>
+#include <Wire.h>
 
-// put function declarations here:
-int myFunction(int, int);
+bool bme280_init();
+bool bh1750_init();
+bool ads1115_init();
+void relay_init();
+void buzzer_init();
+bool oled_init();
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  Serial.begin(115200);
+  Wire.begin();  // GPIO8 SDA, GPIO9 SCL by default on most ESP32-S3 boards.
+
+  bool bmeOk = bme280_init();
+  bool bhOk = bh1750_init();
+  bool adsOk = ads1115_init();
+  relay_init();
+  buzzer_init();
+  bool oledOk = oled_init();
+
+  Serial.println("PhytoSense++ skeleton boot");
+  Serial.printf("BME280: %s | BH1750: %s | ADS1115: %s | OLED: %s\n",
+                bmeOk ? "OK" : "FAIL", bhOk ? "OK" : "FAIL",
+                adsOk ? "OK" : "FAIL", oledOk ? "OK" : "FAIL");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  Serial.println("alive");
+  delay(2000);
 }
