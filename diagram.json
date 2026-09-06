@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "author": "PhytoSense++",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-s3-devkitc-1", "id": "esp32", "top": 0, "left": 0, "attrs": {} },
+
+    { "type": "wokwi-bmp180", "id": "bmp180_1", "top": -140, "left": 260, "attrs": {} },
+    { "type": "wokwi-ssd1306", "id": "oled1", "top": -260, "left": 260, "attrs": {} },
+
+    { "type": "wokwi-potentiometer", "id": "pot_bh1750_stub", "top": -60, "left": 260, "attrs": { "value": "500" } },
+    { "type": "wokwi-potentiometer", "id": "pot_ad8232_stub", "top": 20, "left": 260, "attrs": { "value": "500" } },
+    { "type": "wokwi-potentiometer", "id": "pot_soil_stub", "top": 100, "left": 260, "attrs": { "value": "500" } },
+
+    { "type": "wokwi-dht22", "id": "dht22_1", "top": -180, "left": -260, "attrs": {} },
+
+    { "type": "wokwi-slide-switch", "id": "sw_lo_plus", "top": -60, "left": -260, "attrs": {} },
+    { "type": "wokwi-slide-switch", "id": "sw_lo_minus", "top": 20, "left": -260, "attrs": {} },
+
+    { "type": "wokwi-relay-module", "id": "relay1", "top": 180, "left": -260, "attrs": {} },
+    { "type": "wokwi-buzzer", "id": "buzzer1", "top": 180, "left": 0, "attrs": { "volume": "0.1" } },
+
+    { "type": "wokwi-microsd-card", "id": "sdcard1", "top": 260, "left": 260, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp32:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp32:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "bmp180_1:VCC", "esp32:3V3", "red", [] ],
+    [ "bmp180_1:GND", "esp32:GND.1", "black", [] ],
+    [ "bmp180_1:SDA", "esp32:8", "green", [] ],
+    [ "bmp180_1:SCL", "esp32:9", "yellow", [] ],
+
+    [ "oled1:VCC", "esp32:3V3", "red", [] ],
+    [ "oled1:GND", "esp32:GND.1", "black", [] ],
+    [ "oled1:SDA", "esp32:8", "green", [] ],
+    [ "oled1:SCL", "esp32:9", "yellow", [] ],
+
+    [ "pot_bh1750_stub:VCC", "esp32:3V3", "red", [] ],
+    [ "pot_bh1750_stub:GND", "esp32:GND.1", "black", [] ],
+    [ "pot_bh1750_stub:SIG", "esp32:3", "orange", [] ],
+
+    [ "pot_ad8232_stub:VCC", "esp32:3V3", "red", [] ],
+    [ "pot_ad8232_stub:GND", "esp32:GND.1", "black", [] ],
+    [ "pot_ad8232_stub:SIG", "esp32:1", "orange", [] ],
+
+    [ "pot_soil_stub:VCC", "esp32:3V3", "red", [] ],
+    [ "pot_soil_stub:GND", "esp32:GND.1", "black", [] ],
+    [ "pot_soil_stub:SIG", "esp32:2", "orange", [] ],
+
+    [ "dht22_1:VCC", "esp32:3V3", "red", [] ],
+    [ "dht22_1:GND", "esp32:GND.2", "black", [] ],
+    [ "dht22_1:SDA", "esp32:15", "blue", [] ],
+
+    [ "sw_lo_plus:2", "esp32:4", "blue", [] ],
+    [ "sw_lo_plus:1", "esp32:3V3", "red", [] ],
+
+    [ "sw_lo_minus:2", "esp32:5", "blue", [] ],
+    [ "sw_lo_minus:1", "esp32:3V3", "red", [] ],
+
+    [ "relay1:VCC", "esp32:5V", "red", [] ],
+    [ "relay1:GND", "esp32:GND.2", "black", [] ],
+    [ "relay1:IN", "esp32:6", "purple", [] ],
+
+    [ "buzzer1:1", "esp32:7", "purple", [] ],
+    [ "buzzer1:2", "esp32:GND.2", "black", [] ],
+
+    [ "sdcard1:VCC", "esp32:3V3", "red", [] ],
+    [ "sdcard1:GND", "esp32:GND.2", "black", [] ],
+    [ "sdcard1:CS", "esp32:10", "green", [] ],
+    [ "sdcard1:DI", "esp32:11", "orange", [] ],
+    [ "sdcard1:DO", "esp32:13", "orange", [] ],
+    [ "sdcard1:SCK", "esp32:12", "yellow", [] ]
+  ],
+  "dependencies": {}
+}
