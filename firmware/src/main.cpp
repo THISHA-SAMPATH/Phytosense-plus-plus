@@ -1,16 +1,26 @@
-// main.cpp — PhytoSense++ Phase 4 data-logging firmware (v4 — ADC CROSSTALK FIX)
+// main.cpp — PhytoSense++ Phase 4 data-logging firmware (v5 — RE-TRIAL READY)
 //
-// v4 CHANGE FROM v3: fixes a confirmed ADC channel-crosstalk issue where
-// bioelectric_raw and soil_raw were found to be 99.77% correlated in trial
-// data — i.e., essentially reading the same value. Root cause: back-to-back
-// analogRead() calls on different ESP32 ADC1 channels with no settling time
-// between them, a known ESP32 multiplexer-switching artifact. Fix: a
-// discarded dummy read + short delay after switching channels, before the
-// real reading is taken.
+// v5 = v4 (ADC crosstalk fix) PLUS two more fixes required by the 16 Sep 2026
+// independent audit before any new trial data can be trusted:
 //
-// Everything else is unchanged from v3 — see that version's header comment
-// for the full pipeline description (bmp280 dual-chip handling, DHT11,
-// cold-start / low-confidence states, SD + Serial logging).
+//   FIX A — On-device oversampling (anti-alias):
+//     The audit found narrow interference lines at 0.25/0.33/0.50 Hz in the
+//     bioelectric spectrum — the signature of periodic interference aliased
+//     by sampling at exactly 1Hz with no filtering beforehand. Fix: instead
+//     of one analogRead() per second, take OVERSAMPLE_COUNT samples spread
+//     across each 1-second cycle and log their average. This acts as a
+//     simple on-device low-pass filter, removing energy above ~Nyquist of
+//     the oversampling rate before it can alias down into the logged signal.
+//
+//   FIX B — BMP280 plausibility check (no more silent glitch values):
+//     Previously, an I2C read failure on the BMP280 could return a
+//     nonsensical value (e.g. 177.40C) which was logged as-is. Now, any
+//     reading outside a physically plausible range is logged as NaN
+//     instead — an honest "no valid reading" rather than a silent glitch
+//     that pollutes downstream analysis.
+//
+// Everything else (pin mapping, cold-start/low-confidence states, SD/Serial
+// logging) is unchanged from v3/v4.
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -18,22 +28,18 @@
 #include <Adafruit_BMP280.h>
 #include <DHT.h>
 
-// --- Pin assignments (confirmed working hardware mapping) ---
+// --- Pin assignments ---
 #define SDA_PIN       8
 #define SCL_PIN       9
-
 #define DHT_PIN       15
 #define DHT_TYPE      DHT11
-
-#define SOIL_PIN      1     // direct ADC1 pin
-#define ECG_PIN       2     // direct ADC1 pin (AD8232 OUTPUT)
+#define SOIL_PIN      1
+#define ECG_PIN       2
 #define LO_PLUS_PIN   4
 #define LO_MINUS_PIN  5
-
 #define GY91_BMP_ADDR 0x76
 #define HW611_ADDR    0x77
 
-// --- Objects ---
 Adafruit_BMP280 gyBmp;
 Adafruit_BMP280 hwBmp;
 DHT dht11(DHT_PIN, DHT_TYPE);
@@ -41,39 +47,61 @@ DHT dht11(DHT_PIN, DHT_TYPE);
 bool gyBmpOk = false;
 bool hwBmpOk = false;
 
-// --- Forward declarations from other driver files (unchanged from repo) ---
 void relay_init();
 void buzzer_init();
 bool oled_init();
-
 bool sd_logger_init();
 bool sd_logger_is_ready();
-bool sd_logger_write_row(unsigned long timestampMs, int16_t bioelectricRaw,
-                          bool loPlus, bool loMinus, int16_t soilRaw,
+bool sd_logger_write_row(unsigned long timestampMs, float bioelectricRaw,
+                          bool loPlus, bool loMinus, float soilRaw,
                           float tempC, float humidityPct, float pressureHpa,
                           const char* readingStatus);
 
-// --- Sampling interval ---
 const unsigned long SAMPLE_INTERVAL_MS = 1000;
 unsigned long lastSampleTime = 0;
 
-// --- Cold-start baseline state ---
 unsigned long validReadingCount = 0;
 const unsigned long COLD_START_THRESHOLD = 200;
 bool baselineReady = false;
 
-// --- NEW (v4): settling delay used between ADC channel switches ---
 const int ADC_CHANNEL_SETTLE_US = 50;
 
-// --- NEW (v4): crosstalk-safe multi-channel ADC read helper ---
-// Discards one reading immediately after switching to a new channel, then
-// waits ADC_CHANNEL_SETTLE_US before taking the reading that's actually used.
-// This clears residual charge left on the ADC's sample-and-hold capacitor
-// by whichever channel was read immediately before it.
+// --- FIX A: oversampling config ---
+// 20 samples spread across each ~1s cycle = effective ~20Hz internal rate,
+// averaged down to the 1Hz logged output. Adjust OVERSAMPLE_COUNT upward
+// later if a higher-rate raw session (per audit action #4) shows the real
+// interference needs more averaging to suppress.
+const int OVERSAMPLE_COUNT = 20;
+const int OVERSAMPLE_SPACING_MS = 40;   // 20 samples * 40ms = 800ms, fits in the 1s cycle
+
 int16_t readAdcChannelClean(int pin) {
-  analogRead(pin);                       // dummy read, discarded
+  analogRead(pin);                       // dummy read, discarded (v4 crosstalk fix)
   delayMicroseconds(ADC_CHANNEL_SETTLE_US);
-  return analogRead(pin);                // real reading
+  return analogRead(pin);
+}
+
+// Oversampled, crosstalk-safe read: averages OVERSAMPLE_COUNT clean readings
+void readBothChannelsOversampled(float &bioAvgOut, float &soilAvgOut) {
+  long bioSum = 0, soilSum = 0;
+  for (int i = 0; i < OVERSAMPLE_COUNT; i++) {
+    bioSum  += readAdcChannelClean(ECG_PIN);
+    soilSum += readAdcChannelClean(SOIL_PIN);
+    delay(OVERSAMPLE_SPACING_MS);
+  }
+  bioAvgOut  = (float)bioSum  / OVERSAMPLE_COUNT;
+  soilAvgOut = (float)soilSum / OVERSAMPLE_COUNT;
+}
+
+// --- FIX B: plausibility-checked environmental reads ---
+float readTempPlausible(Adafruit_BMP280 &bmp) {
+  float t = bmp.readTemperature();
+  if (isnan(t) || t < -10.0f || t > 60.0f) return NAN;   // reject implausible/garbage reads
+  return t;
+}
+float readPressurePlausible(Adafruit_BMP280 &bmp) {
+  float p = bmp.readPressure() / 100.0F;
+  if (isnan(p) || p < 850.0f || p > 1100.0f) return NAN;
+  return p;
 }
 
 void setup() {
@@ -100,14 +128,12 @@ void setup() {
   buzzer_init();
   bool oledOk = oled_init();
 
-  Serial.println("PhytoSense++ Phase 4 logging firmware boot (v4 - ADC crosstalk fix)");
+  Serial.println("PhytoSense++ Phase 4 logging firmware boot (v5 - oversampled + plausibility-checked)");
   Serial.printf("GY-91 BMP280(0x76): %s | HW-611 BMP280(0x77): %s | DHT11: OK | SD: %s | OLED: %s\n",
                 gyBmpOk ? "OK" : "FAIL", hwBmpOk ? "OK" : "FAIL",
                 sdOk ? "OK" : "FAIL", oledOk ? "OK" : "FAIL");
+  Serial.printf("Oversampling: %d samples/cycle @ %dms spacing\n", OVERSAMPLE_COUNT, OVERSAMPLE_SPACING_MS);
 
-  if (!gyBmpOk && !hwBmpOk) {
-    Serial.println("WARNING: neither BMP280 responded. Check I2C wiring and HW-611 SDO->3V3 bridge.");
-  }
   if (!sdOk) {
     Serial.println("NOTE: SD not ready — logging to Serial only.");
   }
@@ -118,23 +144,25 @@ void loop() {
   if (now - lastSampleTime < SAMPLE_INTERVAL_MS) {
     return;
   }
-  lastSampleTime = now;
 
   bool loPlus  = digitalRead(LO_PLUS_PIN);
   bool loMinus = digitalRead(LO_MINUS_PIN);
   bool contactBad = loPlus || loMinus;
 
-  // --- v4 FIX: crosstalk-safe reads instead of plain back-to-back analogRead() ---
-  int16_t bioelectricRaw = readAdcChannelClean(ECG_PIN);
-  int16_t soilRaw        = readAdcChannelClean(SOIL_PIN);
+  // --- FIX A applied here: oversampled reads instead of a single sample ---
+  float bioelectricRaw, soilRaw;
+  readBothChannelsOversampled(bioelectricRaw, soilRaw);
+  lastSampleTime = millis();   // account for time spent oversampling
 
+  // --- FIX B applied here: plausibility-checked, NaN on failure ---
   float tempC = NAN, pressureHpa = NAN;
   if (gyBmpOk) {
-    tempC       = gyBmp.readTemperature();
-    pressureHpa = gyBmp.readPressure() / 100.0F;
-  } else if (hwBmpOk) {
-    tempC       = hwBmp.readTemperature();
-    pressureHpa = hwBmp.readPressure() / 100.0F;
+    tempC       = readTempPlausible(gyBmp);
+    pressureHpa = readPressurePlausible(gyBmp);
+  }
+  if ((isnan(tempC) || isnan(pressureHpa)) && hwBmpOk) {
+    if (isnan(tempC))       tempC       = readTempPlausible(hwBmp);
+    if (isnan(pressureHpa)) pressureHpa = readPressurePlausible(hwBmp);
   }
   float humidityPct = dht11.readHumidity();
 
@@ -152,7 +180,7 @@ void loop() {
     status = "ok";
   }
 
-  Serial.printf("[%lu] bio=%d lo+=%d lo-=%d soil=%d temp=%.2fC hum=%.2f%% "
+  Serial.printf("[%lu] bio=%.1f lo+=%d lo-=%d soil=%.1f temp=%.2fC hum=%.2f%% "
                 "pres=%.2fhPa status=%s\n",
                 now, bioelectricRaw, loPlus, loMinus, soilRaw,
                 tempC, humidityPct, pressureHpa, status);
