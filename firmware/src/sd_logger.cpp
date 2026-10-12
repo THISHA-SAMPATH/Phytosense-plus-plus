@@ -1,8 +1,8 @@
 // sd_logger.cpp
-// microSD logging over SPI. Pin mapping per Connection Diagrams pin table:
-//   GPIO10 = CS, GPIO11 = MOSI, GPIO12 = SCK, GPIO13 = MISO
+// microSD logging over SPI. Pin mapping: GPIO10=CS, GPIO11=MOSI, GPIO12=SCK, GPIO13=MISO
 //
-// v2 CHANGE: light_lux column removed — no BH1750 hardware on hand.
+// v5 CHANGE: bioelectricRaw/soilRaw are now floats (oversampled averages),
+// not int16_t — matches v5 main.cpp's anti-alias oversampling fix.
 
 #include <SPI.h>
 #include <SD.h>
@@ -42,10 +42,10 @@ bool sd_logger_is_ready() {
 }
 
 bool sd_logger_write_row(unsigned long timestampMs,
-                          int16_t bioelectricRaw,
+                          float bioelectricRaw,
                           bool loPlus,
                           bool loMinus,
-                          int16_t soilRaw,
+                          float soilRaw,
                           float tempC,
                           float humidityPct,
                           float pressureHpa,
@@ -58,9 +58,10 @@ bool sd_logger_write_row(unsigned long timestampMs,
     return false;
   }
 
-  f.printf("%lu,%d,%d,%d,%d,%.2f,%.2f,%.2f,%s\n",
+  f.printf("%lu,%.2f,%d,%d,%.2f,%.2f,%.2f,%.2f,%s\n",
            timestampMs, bioelectricRaw, loPlus ? 1 : 0, loMinus ? 1 : 0,
            soilRaw, tempC, humidityPct, pressureHpa, readingStatus);
   f.close();
   return true;
 }
+
