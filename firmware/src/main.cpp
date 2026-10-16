@@ -1,15 +1,17 @@
-// main.cpp — PhytoSense++ v6: recording firmware + on-device signal-quality gate
+// main.cpp — PhytoSense++ v7: recording firmware + on-device signal-quality gate (no OLED)
 //
-// Changes vs v5 (logging behaviour is kept; every new CSV column is additive):
-//   1. Per-cycle ADC stats: min / max / how many raw samples sat at the ADC ceiling.
-//   2. Signal-quality gate with a reason code: contact | rail_hi | rail_lo | flat | jump.
-//   3. Fixed-size ring-buffer baseline (bounded memory) that learns ONLY from good samples.
-//   4. status is now: cold_start | low_confidence | ok | deviation.
-//   5. Serial warning when the signal stays railed; optional OLED status; optional buzzer (off).
+// Changes vs v6:
+//   1. OLED removed completely (declarations, init, status block, boot print).
+//   Everything else (ADC stats, quality gate with reason code, bounded-memory
+//   ring baseline that learns ONLY from good samples, status codes) is unchanged.
+//
+// Status values: cold_start | low_confidence | ok | deviation
+// Gate reason codes: contact | rail_hi | rail_lo | flat | jump | none
 //
 // NOTE: firmware cannot FIX a railed analog front-end, it can only detect it.
-// Gate thresholds below are first values taken from the 12-14 Oct 2026 log.
-// Re-derive them from the post-fix bench log before you trust them.
+// Gate thresholds below are first values taken from the 12-14 Oct 2026 log, which
+// was itself mostly railed. Re-derive them from the post-fix preflight/trial log
+// before you trust them.
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -20,7 +22,6 @@
 #include <string.h>
 
 // ---------------- Build-time switches ----------------
-#define ENABLE_OLED_STATUS 1   // show status on the OLED every 5 s (if the OLED is detected)
 #define ENABLE_BUZZER      0   // keep 0 during the multi-day recording; set 1 for the demo video
 
 // ---------------- Pin assignments (unchanged) ----------------
@@ -41,13 +42,10 @@ DHT dht11(DHT_PIN, DHT_TYPE);
 
 bool gyBmpOk = false;
 bool hwBmpOk = false;
-bool oledOk  = false;
 
 void relay_init();
 void buzzer_init();
 void buzzer_alert(bool on);
-bool oled_init();
-void oled_show_status(const char* status, float bio, float z, const char* reason);
 bool sd_logger_init();
 bool sd_logger_is_ready();
 bool sd_logger_write_row(unsigned long timestampMs, float bioelectricRaw,
@@ -74,7 +72,7 @@ const float JUMP_MAX              = 1200.0f;// clean data's largest 1 s step was
 
 // ---------------- Bounded-memory baseline ----------------
 const int   BASELINE_N            = 1800;   // fixed memory: last 1800 GOOD samples (~30 min)
-const int   MIN_BASELINE_SAMPLES  = 200;    // cold-start threshold (same as before)
+const int   MIN_BASELINE_SAMPLES  = 200;    // cold-start threshold
 const float DEVIATION_Z           = 3.0f;
 const unsigned long BASELINE_RESET_AFTER_BAD_S = 600;  // 10 min of bad data => forget baseline
 
@@ -206,12 +204,11 @@ void setup() {
   bool sdOk = sd_logger_init();
   relay_init();
   buzzer_init();
-  oledOk = oled_init();
 
-  Serial.println("PhytoSense++ firmware boot (v6 - recording + on-device quality gate)");
-  Serial.printf("GY-91 BMP280(0x76): %s | HW-611 BMP280(0x77): %s | SD: %s | OLED: %s\n",
+  Serial.println("PhytoSense++ firmware boot (v7 - recording + on-device quality gate, no OLED)");
+  Serial.printf("GY-91 BMP280(0x76): %s | HW-611 BMP280(0x77): %s | SD: %s\n",
                 gyBmpOk ? "OK" : "FAIL", hwBmpOk ? "OK" : "FAIL",
-                sdOk ? "OK" : "FAIL", oledOk ? "OK" : "FAIL");
+                sdOk ? "OK" : "FAIL");
   Serial.printf("Oversampling: %d samples/cycle @ %dms | baseline ring: %d samples | cold start: %d\n",
                 OVERSAMPLE_COUNT, OVERSAMPLE_SPACING_MS, BASELINE_N, MIN_BASELINE_SAMPLES);
   if (!sdOk) Serial.println("NOTE: SD not ready - logging to Serial only.");
@@ -296,13 +293,6 @@ void loop() {
 
   sd_logger_write_row(now, c.bioAvg, loPlus, loMinus, c.soilAvg,
                       tempC, humidityPct, pressureHpa, status);
-
-#if ENABLE_OLED_STATUS
-  static unsigned int cycleCount = 0;
-  if (oledOk && (cycleCount++ % 5 == 0)) {
-    oled_show_status(status, c.bioAvg, z, reason);
-  }
-#endif
 
 #if ENABLE_BUZZER
   buzzer_alert(strcmp(status, "deviation") == 0);   // silent for low_confidence / cold_start
