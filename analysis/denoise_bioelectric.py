@@ -42,7 +42,7 @@ from scipy.signal import butter, filtfilt, medfilt, iirnotch
 import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------------- settings
-CSV_PATH = "phytosense_trial_log.csv"
+CSV_PATH = "../data/trial_v7.csv"
 TRIAL_START = "2026-09-12 16:33:00"     # per Master Reference Sec 8 (reattachment)
 LEAF_DAMAGE_TS = "2026-09-12 21:30:00"  # per Master Reference Sec 8
 DESPIKE_WINDOW = 5          # samples (odd number), median filter

@@ -1,10 +1,11 @@
 """
-PhytoSense++ - Personalized bounded-memory baseline + gating ablation (v2)
+PhytoSense++ - Personalized bounded-memory baseline + gating ablation (v3)
 --------------------------------------------------------------------------
 Usage:
   python build_baseline_model.py <trial_csv> <bioelectric_denoised.csv> [out_dir]
 
-Two baselines are run on the SAME recording so the effect of the gate is measurable:
+Two baselines are run on the SAME recording AND the SAME signal (raw ADC) so the
+effect of the gate is measurable and not confounded by filtering:
   GATED   : fixed 30-min window, learns only from samples that pass the quality
             gate (same rules as firmware: contact | rail_hi | rail_lo | flat | jump).
   UNGATED : same window and threshold, learns from every sample, gate ignored.
@@ -14,8 +15,15 @@ samples BEFORE it (shift(1)), then added. Deviation = |z| > 3.
 
 Outputs: baseline_model_results.csv, ablation_summary.txt, baseline_ablation.png.
 Event markers come from the 'event' column of the log (nothing date-hard-coded).
-Read the numbers honestly: with a no-stress recording, every deviation is a
-FALSE ALARM; real lead-time needs a log with a timed stimulus.
+
+Read the numbers honestly:
+  - With a no-stress recording, every deviation is a FALSE ALARM; real lead-time
+    needs a log with a timed stimulus.
+  - The gate only helps if the log contains bad samples to reject. If gate_reason
+    is 'none' on every row, gated and ungated will behave almost identically.
+  - Seconds with no logged sample (recording gaps) count as "not good", so the
+    gated arm scores fewer seconds than the ungated arm. Compare deviation counts
+    and scored hours, not only the per-hour rate.
 """
 
 import os
@@ -68,18 +76,20 @@ def main():
     grid = pd.DataFrame(index=raw["bioelectric_raw"].resample("1s").mean().index)
     grid["raw"] = raw["bioelectric_raw"].resample("1s").mean()
     grid["good"] = raw["good"].resample("1s").mean().reindex(grid.index).fillna(0) >= 0.5
-    grid["den"] = den.reindex(grid.index)
+    # FIX: log timestamps carry milliseconds, so resample onto the 1 s grid
+    # (a plain reindex matches almost nothing and leaves the denoised column empty)
+    grid["den"] = den.resample("1s").mean().reindex(grid.index)
 
-    # GATED: denoised signal on good samples only (NaN elsewhere = never learned, never scored)
-    gated_sig = grid["den"].where(grid["good"])
-    # UNGATED: raw signal, every sample, gate ignored
+    # GATED: raw signal on good samples only (NaN elsewhere = never learned, never scored)
+    gated_sig = grid["raw"].where(grid["good"])
+    # UNGATED: same raw signal, every sample, gate ignored
     ungated_sig = grid["raw"].interpolate(limit=5)
 
     grid["z_gated"], grid["ready_gated"] = causal_z(gated_sig)
     grid["z_ungated"], grid["ready_ungated"] = causal_z(ungated_sig)
 
     def status(row):
-        if not row["good"] or pd.isna(row["den"]):
+        if not row["good"] or pd.isna(row["raw"]):
             return "low_confidence"
         if not row["ready_gated"] or pd.isna(row["z_gated"]):
             return "cold_start"
@@ -141,7 +151,7 @@ def main():
 
     fig, ax = plt.subplots(2, 1, figsize=(14, 7), sharex=True)
     ax[0].plot(grid.index, grid["raw"], lw=0.4, alpha=0.5, label="raw")
-    ax[0].plot(grid.index, grid["den"], lw=0.8, label="denoised (gated)")
+    ax[0].plot(grid.index, grid["den"], lw=0.8, label="denoised (reference only)")
     ax[0].legend(); ax[0].set_ylabel("ADC counts")
     ax[1].plot(grid.index, grid["z_ungated"], lw=0.4, alpha=0.6, label="z ungated")
     ax[1].plot(grid.index, grid["z_gated"], lw=0.6, label="z gated")
@@ -150,7 +160,9 @@ def main():
     for _, ev in events.iterrows():
         for a in ax:
             a.axvline(ev["t"], color="red", ls="--", lw=0.8)
-    plt.tight_layout(); plt.savefig(os.path.join(out_dir, "baseline_ablation.png"), dpi=150); plt.close()
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, "baseline_ablation.png"), dpi=150)
+    plt.close()
 
 
 if __name__ == "__main__":
