@@ -2,3 +2,6 @@
 # Node / dashboard node_modules/ dist/ build/ 
 # Editor / OS junk .vscode/ .idea/ .DS_Store Thumbs.db 
 # Large or sensitive data data/raw/ *.log
+out/
+__pycache__/
+.pio/
