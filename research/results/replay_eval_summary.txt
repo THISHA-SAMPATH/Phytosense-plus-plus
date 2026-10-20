@@ -1,0 +1,14 @@
+fault rows=115633 (32.1 h) clean rows=58891 (16.4 h)
+[B] CLEAN
+ rejected 0.00% reasons={}
+ dev samples 1.29%  events gated=3 ungated=3
+[A] FAULT then CLEAN (spliced)
+ fault: rejected 80.3%  reasons={'rail_hi': 92766, 'flat': 36, 'jump': 1}
+ invalid rows=92803  ungated treated as normal=92515 (99.7%)
+ first 2h after fault: false alarms gated=54 ungated=74
+ clean part events gated=3 ungated=4  rate/h gated=46.54 ungated=47.68
+ ungated last alarm 16.34 h after
+ gated last alarm 16.34 h after
+[C] INJECTED FAULTS (SIMULATED: 6 rail episodes, 12 spikes, 4 offset steps)
+ caught 70.6%  clean wrongly rejected 0.03%  alarms gated=1129 ungated=1638
+ memory: ring = 1800 floats (7.0 KB), constant regardless of run length

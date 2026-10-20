@@ -1,4 +1,28 @@
-# PlatformIO / firmware .pio/ .pioenvs/ .piolibdeps/ # Python __pycache__/ *.pyc .ipynb_checkpoints/ venv/ 
-# Node / dashboard node_modules/ dist/ build/ 
-# Editor / OS junk .vscode/ .idea/ .DS_Store Thumbs.db 
-# Large or sensitive data data/raw/ *.log
+# PlatformIO / firmware
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+venv/
+
+# Node / dashboard
+node_modules/
+dist/
+build/
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Large or sensitive data
+data/raw/
+*.log
+
+# Research datasets (keep local; do not commit)
+research/data_public/
