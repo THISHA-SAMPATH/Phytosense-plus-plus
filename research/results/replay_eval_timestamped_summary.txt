@@ -1,0 +1,48 @@
+TIMESTAMP-AWARE REPLAY EVALUATION
+Input CSV: research\data_public\phytosense_trial_log_full.csv
+Invalid timestamps dropped: 0
+Duplicate timestamp rows combined: fault=79, clean=7
+Baseline window: previous 1800 seconds
+Minimum baseline samples: 200
+Long-gap reset threshold: > 10.0 seconds
+Scored interval limit: <= 1.5 seconds
+
+[FAULT RECORDING]
+ rows=115554 unique timestamps; start=2026-10-12 22:03:26.577000; end=2026-10-14 17:51:59.007000
+ elapsed span=43.809 h; eligible scored time=22.650 h
+ rejected=80.25% reasons={'rail_hi': np.int64(92697), 'flat': np.int64(35), 'jump': np.int64(1)}
+ deviation samples: gated=0.20%; ungated=0.94%
+ events (10 consecutive eligible samples): gated=0; ungated=0
+ alarm samples per eligible hour: gated=8.21; ungated=37.35
+
+[CLEAN RECORDING]
+ rows=58884 unique timestamps; start=2026-10-18 07:32:53.361000; end=2026-10-19 00:14:30.946000
+ elapsed span=16.694 h; eligible scored time=13.667 h
+ rejected=0.00% reasons={}
+ deviation samples: gated=1.29%; ungated=1.29%
+ events (10 consecutive eligible samples): gated=3; ungated=3
+ alarm samples per eligible hour: gated=49.90; ungated=49.90
+
+[FIRST TWO HOURS OF CLEAN RECORDING]
+ window=2026-10-18 07:32:53.361000 to 2026-10-18 09:32:53.361000
+ rows=7172; gated alarms=54; ungated alarms=54
+ This window is not immediately after the fault recording; the recordings are separated by a long unobserved gap.
+
+[INJECTED FAULTS - SIMULATED]
+ Injection types: 6 rail episodes, 12 spikes, 4 offset steps
+ Rail-labelled samples: detected 4695 / 4695 eligible labelled samples (100.00%)
+ Spike-labelled samples: detected 12 / 12 eligible labelled samples (100.00%)
+ Offset-labelled samples: detected 700 / 2157 eligible labelled samples (32.45%)
+ All injected samples: detected 5175 / 6632 eligible labelled samples (78.03%)
+ Clean eligible samples wrongly rejected or alarmed: 578 / 47335 (1.22%)
+ Gate-rejected samples: 5153
+ Deviation samples: gated=1127; ungated=1638
+ Synthetic results are controlled test outputs, not evidence of field or clinical performance.
+
+[INTERPRETATION NOTES]
+Fault and clean recordings are evaluated independently.
+The baseline uses a timestamp-based 1800-second window.
+Only positive intervals up to 1.5 seconds count toward eligible time.
+Gated and ungated alarm rates share the same eligible-time denominator.
+Event counts require 10 consecutive detected samples with eligible intervals.
+Synthetic injected-fault results do not establish clinical or field validation.
