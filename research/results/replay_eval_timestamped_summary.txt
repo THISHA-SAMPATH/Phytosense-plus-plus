@@ -12,8 +12,8 @@ Only eligible intervals count toward alarm rates.
 [FAULT RECORDING]
  rows=115554 unique timestamps; start=2026-10-12 22:03:26.577000; end=2026-10-14 17:51:59.007000
  elapsed span=43.809 h; eligible scored time=22.650 h
- eligible intervals=87971; rejected=80.26%
- rejection reasons={'rail_hi': 92697, 'jump': 45}
+ eligible intervals=87971; rejected=80.29%
+ rejection reasons={'rail_hi': 92697, 'jump': 45, 'flat': 35}
  Deviation samples across all rows: gated=0.20%; ungated=0.94%
  Eligible alarm samples: gated=186; ungated=846
  Distinct alarm events (10 consecutive eligible samples): gated=0; ungated=0
