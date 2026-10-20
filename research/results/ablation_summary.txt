@@ -1,0 +1,7 @@
+Recording span: 871.92 h on a 1 s grid
+Samples passing gate: 6.9%   (discarded: 93.1%)
+Gate reasons in log: not in this log (fallback gate used)
+Memory: fixed 1800 s window (<= 1800 samples), independent of run length
+No stimulus event in the log -> whole recording treated as NO-STRESS; every deviation = false alarm.
+GATED   : 4312 deviations over 59.42 h scored -> 72.57 false alarms/h
+UNGATED : 5677 deviations over 99.80 h scored -> 56.89 false alarms/h
