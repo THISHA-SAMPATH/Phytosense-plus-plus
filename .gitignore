@@ -26,3 +26,6 @@ data/raw/
 
 # Research datasets (keep local; do not commit)
 research/data_public/
+
+analysis/replay_eval_before_timing_fix.py
+analysis/replay_eval_timestamped_backup.py
