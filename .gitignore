@@ -28,4 +28,5 @@ data/raw/
 research/data_public/
 
 analysis/replay_eval_before_timing_fix.py
-analysis/replay_eval_timestamped_backup.pyresearch/results/baseline_model_results.csv
+analysis/replay_eval_timestamped_backup.py
+/research/results/baseline_model_results.csv
