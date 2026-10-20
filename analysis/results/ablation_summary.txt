@@ -1,8 +1,0 @@
-Recording span: 2.67 h on a 1 s grid
-Samples passing gate: 57.2%   (discarded: 42.8%)
-Gate reasons in log: {'none': 6364}
-Memory: fixed 1800 s window (<= 1800 samples), independent of run length
-No stimulus event in the log -> whole recording treated as NO-STRESS; every deviation = false alarm.
-GATED   : 47 deviations over 1.36 h scored -> 34.45 false alarms/h
-UNGATED : 49 deviations over 2.40 h scored -> 20.39 false alarms/h
-Event 'baseline_start' @ 2026-10-17 22:21:26.566000: first deviation gated=588 s, ungated=588 s
