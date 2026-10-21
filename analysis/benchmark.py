@@ -1,6 +1,13 @@
 """
 Stream-level benchmark for PhytoSense++ detectors, leave-one-day-out.
 
+Detectors: firmware baseline, winsorised update, freeze-on-deviation (fixed 900-sample
+re-learn), CUSUM, Page-Hinkley, and the stability-based re-learn rule (accept a new level
+only if it persists beyond T >= 600 s; release a deviation if the level returns within BAND SD).
+Event kinds: step, sustained (transient, 3/4/6 SD), drift, spike, rail (transient by design),
+permanent (shift from onset to end of recording). Amplitudes use a robust scale (MAD) and events
+whose shifted samples would reach the ADC rails are dropped and counted.
+
 Protocol
   1. Load each CSV and split into contiguous segments at gaps > GAP_S seconds.
   2. Keep segments with >= MIN_GOOD_H usable hours after SKIP_S.
@@ -46,14 +53,19 @@ PH_DELTA = 0.5
 CUSUM_H = (8, 16, 32, 64, 128, 256, 512)
 PH_LAM = (10, 20, 40, 80, 160, 320, 640)
 FIXED = ["baseline", "freeze", "winsor"]
-ADAPTIVE = ["cusum", "ph"]
+ADAPTIVE = ["cusum", "ph", "stable"]
 
+# Existing kinds are TRANSIENT: the shift starts at t and returns to baseline after dur seconds.
+# "permanent" is PERMANENT: the shift starts once per segment and never returns within the recording.
 EVENTS = [("step", 6, 60), ("sustained", 3, 600), ("sustained", 4, 600),
-          ("sustained", 6, 600), ("drift", 6, 1800), ("spike", 10, 3), ("rail", 0, 60)]
+          ("sustained", 6, 600), ("drift", 6, 1800), ("spike", 10, 3), ("rail", 0, 60),
+          ("permanent", 6, 0)]
 
 CONFIGS = [dict(family=m, setting=m, method=m, params={}) for m in FIXED]
 CONFIGS += [dict(family="cusum", setting=f"cusum(h={h})", method="cusum", params={"h": h}) for h in CUSUM_H]
 CONFIGS += [dict(family="ph", setting=f"ph(lam={l})", method="ph", params={"lam": l}) for l in PH_LAM]
+CONFIGS += [dict(family="stable", setting=f"stable(band={b},T={T})", method="stable",
+                 params={"band": b, "T": T, "W": 60}) for b in (1.0, 2.0) for T in (600, 900, 1800)]   # T >= longest transient (600 s)
 
 
 def load_segments(path):
@@ -96,6 +108,12 @@ def gate(x, lo):
 
 
 def inject(x, sd, kind, mag, dur, n):
+    if kind == "permanent":
+        t = SKIP_S + EVENT_LEAD_S
+        if t + GUARD_S + 600 >= n:          # need at least 10 min after onset to score
+            return x.copy(), []
+        y = x.copy(); y[t:] += mag * sd
+        return y, [(t, n - t - GUARD_S)]
     y = x.copy(); events = []
     t = SKIP_S + EVENT_LEAD_S
     while t + dur + GUARD_S < n:
@@ -128,8 +146,62 @@ class Ring:
         self.s1 += x; self.s2 += x * x
 
 
+
+def detect_stable(x, good, p):
+    """Stability-based re-learn rule.
+    Entry: same as freeze (|z| > Z_THR for PERSIST consecutive gated samples).
+    While in deviation the baseline is frozen and the mean of the last W samples
+    (counted from onset) is compared with the baseline:
+      - if it is back within BAND SD of the baseline -> TRANSIENT: resume normal.
+      - if it is still outside BAND after more than T samples -> PERMANENT:
+        accept the recent level as the new baseline (cold restart, as freeze does).
+    Alerts are raised while in deviation and not yet resolved."""
+    band = p["band"]; T = p["T"]; W = p.get("W", 60)
+    n = len(x); alert = np.zeros(n, bool)
+    R = Ring(BASE_N); run = 0
+    dev = False; dev_len = 0
+    recent = np.zeros(W); rh = 0; rc = 0
+    for i in range(n):
+        if not good[i]:
+            run = 0
+            continue
+        v = x[i]
+        if R.c < MIN_N:
+            R.push(v); continue
+        m, s = R.stats()
+        z = (v - m) / (s + 1e-6)
+        if not dev:
+            run = run + 1 if abs(z) > Z_THR else 0
+            if run >= PERSIST:
+                dev = True; dev_len = 0; rh = 0; rc = 0
+                alert[i] = True
+            else:
+                R.push(v)
+            continue
+        # in deviation: baseline frozen, track post-onset samples
+        dev_len += 1
+        recent[rh] = v; rh = (rh + 1) % W; rc = min(rc + 1, W)
+        if rc < 10:
+            alert[i] = True
+            continue
+        rm = recent[:rc].mean()
+        rz = (rm - m) / (s + 1e-6)
+        if abs(rz) < band:                       # transient: level returned
+            dev = False; run = 0; R.push(v)
+            continue
+        if dev_len > T:                          # permanent: accept new level
+            R.reset()
+            for u in recent[:rc]:
+                R.push(u)
+            dev = False; run = 0
+            continue
+        alert[i] = True
+    return alert
+
 def detect(x, good, method, p=None):
     p = p or {}
+    if method == "stable":
+        return detect_stable(x, good, p)
     h = p.get("h", 0.0); lam = p.get("lam", 0.0)
     n = len(x); alert = np.zeros(n, bool)
     R = Ring(BASE_N); run = 0; frozen = 0
@@ -205,10 +277,15 @@ def main():
         print("  ", d)
 
     ev_rows, fa_rows = [], []
+    dropped_rail = {}
     for s, good_clean in usable:
         x, lo = s["bio"], s["lo"]
         key = f"{s['src']}|{s['day']}"
-        sd = np.std(x[:SKIP_S][good_clean[:SKIP_S]]) if good_clean[:SKIP_S].sum() > 200 else np.std(x)
+        ref = x[:SKIP_S][good_clean[:SKIP_S]]
+        if len(ref) > 200:
+            sd = 1.4826 * np.median(np.abs(ref - np.median(ref)))   # robust scale (MAD)
+        else:
+            sd = 1.4826 * np.median(np.abs(x - np.median(x)))
         clean = {}
         for cfg in CONFIGS:
             a = detect(x, good_clean, cfg["method"], cfg["params"]); a[:SKIP_S] = False
@@ -217,6 +294,10 @@ def main():
                                 onsets=onsets(a), hours=good_clean[SKIP_S:].sum() / 3600))
         for kind, mag, dur in EVENTS:
             y, evs = inject(x, sd, kind, mag, dur, len(x))
+            if kind != "rail":
+                keep = [(t, d_) for (t, d_) in evs if y[t:t + d_].max() < 4090 and y[t:t + d_].min() > 50]
+                dropped_rail[(kind, mag)] = dropped_rail.get((kind, mag), 0) + (len(evs) - len(keep))
+                evs = keep
             if not evs:
                 continue
             good = gate(y, lo)
@@ -226,6 +307,7 @@ def main():
                     ev_rows.append(dict(key=key, family=cfg["family"], setting=cfg["setting"], **r))
         print(f"  {key}: done")
 
+    print("events dropped because the shifted signal would hit the ADC rails:", dropped_rail)
     ev = pd.DataFrame(ev_rows); fa = pd.DataFrame(fa_rows)
     ev["excess"] = ev.hit.astype(float) - ev.bg_hit.astype(float)
     ev.to_csv("out/bench_events.csv", index=False)
@@ -240,7 +322,7 @@ def main():
             names = [c["setting"] for c in CONFIGS if c["family"] == fam]
             tf = fa[(fa.family == fam) & fa.key.isin(train)].groupby("setting")[["onsets", "hours"]].sum()
             rate = (tf.onsets / tf.hours).reindex(names)
-            te = ev[(ev.family == fam) & ev.key.isin(train) & (ev.kind != "rail")]
+            te = ev[(ev.family == fam) & ev.key.isin(train) & ~ev.kind.isin(["rail", "permanent"])]
             mexc = te.groupby("setting").excess.mean().reindex(names)
             ok = [n for n in names if rate[n] <= FA_BUDGET]
             if ok:
@@ -305,6 +387,7 @@ def main():
         dict(detector="winsorised update", state_bytes=BASE_N * 4 + 16, ops_per_sample="~15 (running sums, two clips)"),
         dict(detector="CUSUM", state_bytes=BASE_N * 4 + 16 + 12, ops_per_sample="~15 (running sums, two accumulators)"),
         dict(detector="Page-Hinkley", state_bytes=BASE_N * 4 + 16 + 20, ops_per_sample="~15 (running sums, four accumulators)"),
+        dict(detector="stability re-learn rule", state_bytes=BASE_N * 4 + 16 + 4 + 8 * 60 + 8, ops_per_sample="~15 (running sums, window of 60 samples: ~60 adds per sample while in deviation)"),
     ])
     cost.to_csv("out/bench_cost.csv", index=False)
 
