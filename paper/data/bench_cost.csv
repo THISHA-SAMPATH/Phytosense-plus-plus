@@ -1,0 +1,6 @@
+detector,state_bytes,ops_per_sample
+firmware baseline,7200,"~3N = 5400 (sum and sum-of-squares recomputed each sample, as in main.cpp)"
+freeze-on-deviation,7220,"~15 (running sums, freeze counter)"
+winsorised update,7216,"~15 (running sums, two clips)"
+CUSUM,7228,"~15 (running sums, two accumulators)"
+Page-Hinkley,7236,"~15 (running sums, four accumulators)"
