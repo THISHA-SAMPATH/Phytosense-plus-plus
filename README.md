@@ -1,185 +1,156 @@
 # PhytoSense++
 
-**A multimodal edge-AI framework for early plant stress prediction, explainable diagnosis, autonomous precision irrigation, and predictive crop-health analytics.**
+**A low-cost embedded system that reads a plant's own bioelectric signal, checks its quality on the device, learns that plant's normal behaviour in a fixed amount of memory, and flags sustained deviations.**
 
-_Embedded Systems Project — VIT Chennai — Faculty-Supported Team of 3_
+_Embedded Systems Project — VIT Chennai — faculty-supported team of 3_
 
-> 🔒 **Private repository.** Do not make public and do not submit any associated paper until the provisional patent has been filed. See [IP Status](#ip-status--publication-timeline) below.
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Core Novelty](#core-novelty)
-- [System Architecture](#system-architecture)
-- [Hardware](#hardware)
-- [Software Stack](#software-stack)
-- [Repository Structure](#repository-structure)
-- [Getting Started](#getting-started)
-- [Build & Verification Workflow](#build--verification-workflow)
-- [Project Roadmap](#project-roadmap)
-- [Documentation](#documentation)
-- [Team](#team)
-- [IP Status & Publication Timeline](#ip-status--publication-timeline)
-- [License](#license)
+> 🔒 **Private repository.** Do not make it public, and do not submit any associated paper, until the provisional patent has been filed (see [IP status](#ip-status)).
 
 ---
 
-## Overview
+## 1. What works today (honest status)
 
-PhytoSense++ is a non-invasive, clip-on device that reads a plant's own bioelectric signal (via surface electrodes on leaf/stem) alongside soil moisture, temperature, humidity, and light. Instead of relying on a fixed population threshold, it learns that _specific_ plant's normal signal pattern on-device and flags deviation as early stress — before visible symptoms appear — then closes the loop with autonomous irrigation and forward-looking health forecasts.
+| Capability                                                                                | Status                                                                   | Evidence                                               |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Bioelectric acquisition (AD8232 → ESP32-S3 ADC, 20× oversampling per 1 s sample)          | ✅ Working                                                               | `firmware/src/main.cpp`, `data/`                       |
+| Signal-quality gate (`contact`, `rail_hi`, `rail_lo`, `flat`, `jump`)                     | ✅ Working                                                               | `analysis/replay_eval.py`, dashboard                   |
+| Bounded-memory personalised baseline (ring buffer of the last 1800 good samples, 7.2 KB)  | ✅ Working                                                               | firmware + `analysis/window_sweep.py`                  |
+| Deviation alert with persistence rule (z > 3 for 10 consecutive good samples)             | ✅ Compiles; validated offline by replay; not yet run on the device      | `analysis/alarm_tuning.py`, `analysis/window_sweep.py` |
+| Environment sensing (DHT11 temperature/humidity, BMP280 pressure) and microSD CSV logging | ✅ Working                                                               | `data/*.csv`                                           |
+| Reliability analysis of logged runs                                                       | ✅ Done                                                                  | `analysis/reliability_report.py`                       |
+| Replay dashboard (gate, baseline band, alerts, fault injection)                           | ✅ Working                                                               | `dashboard/`                                           |
+| Soil-moisture channel                                                                     | ⚠️ Not validated — the reading tracks the bioelectric channel (r ≈ 0.98) | see Limitations                                        |
+| Buzzer alert                                                                              | ⚙️ Code present, disabled during long recordings (`ENABLE_BUZZER 0`)     | `firmware/src/buzzer.cpp`                              |
+| Relay / pump irrigation control                                                           | ⚙️ Driver present, **not wired into the main loop**                      | `firmware/src/relay_control.cpp`                       |
+| Explainable diagnosis, forecasting, on-device TensorFlow Lite Micro model                 | 🔭 Future work — not implemented                                         | —                                                      |
+| Detection of real plant stress events (leaf damage, drought)                              | 🔭 Not yet validated — see Limitations                                   | `analysis/event_eval.py`                               |
 
-## Core Novelty
+## 2. Key results
 
-| #   | Contribution                                               | Description                                                                                                                                        | In patent claim?            |
-| --- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| 1   | **Personalized, bounded-memory baseline learning**         | A fixed-size, self-refreshing model of one plant's normal signal — not a population average.                                                       | ✅ Yes                      |
-| 2   | **Electrode-contact-quality self-diagnosis**               | An ECG/EEG impedance self-check technique applied to plant tissue for the first time, separating genuine stress from bad electrode contact.        | ✅ Yes (dependent claim)    |
-| 3   | **On-device explainable diagnosis**                        | Lightweight feature-attribution (embedded-feasible proxy for SHAP/Grad-CAM) that names which signal drove each alert.                              | ❌ No — system feature only |
-| 4   | **Autonomous precision irrigation + predictive analytics** | Closed-loop relay/pump actuation driven by the fused stress classifier, plus a short-horizon forecasting layer surfaced via a BLE/Wi-Fi dashboard. | ❌ No — system feature only |
+| Result                                           | Value                                                                                                                                                                 | How measured                                             |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Firmware footprint (ESP32-S3)                    | RAM 27,500 B (8.4%), Flash 362,893 B (10.9% of the app partition)                                                                                                     | `pio run`                                                |
+| Baseline memory                                  | 7.2 KB (1800 × float32), constant for any run length                                                                                                                  | design                                                   |
+| Long-run stability                               | 10.1 h continuous run, **0 reboots**, 99.1% availability (earlier firmware: a reboot about every 30 s)                                                                | `analysis/reliability_report.py`                         |
+| False alarms                                     | about 29 / hour with a single-sample z > 3 rule → about 0.4 / hour with the 10-sample persistence rule                                                                | offline replay of ≈ 18 h of clean, unlabelled recordings |
+| Catch rate at +6 SD (synthetic steps, 29 events) | 90% with 9 s latency                                                                                                                                                  | firmware-mirror replay, `analysis/window_sweep.py`       |
+| Window size                                      | Results are on a plateau between 5 and 30 min. 1–2 min is unstable, and ≥ 1 h loses sensitivity because slow drift inflates the SD. A 10-min window needs only 2.4 KB | `analysis/window_sweep.py`                               |
+| Fault handling                                   | Railed or invalid stretches are rejected by the gate and never update the baseline; no alerts are raised on them                                                      | `analysis/replay_eval.py`, dashboard fault injection     |
 
-No reviewed system currently combines all four in a single field-deployable embedded pipeline, which is the novelty claim **for the research paper**. The **patent claim is narrower**: only items 1–2 (personalized bounded-memory baseline + electrode-contact-quality self-diagnosis, with confidence-gated updates) are claimed. Items 3–4 are heavily prior-arted individually and are described in the paper/demo only — see the Master Document, Section 7.1 (Claim Boundary), before drafting any invention disclosure or claim language.
+Catch rates use **synthetic injected steps**. False-alarm figures are on **unlabelled** data, so real environmental events are counted as false alarms.
 
-## System Architecture
-
-```
- Sensing Layer
-   Bioelectric (AD8232) · Soil moisture · Temp/Humidity (BME280) · Light (BH1750)
-        |
- Signal Conditioning
-   Denoising -> Feature extraction -> Electrode-contact-quality self-check
-        |
- On-Device Models (TensorFlow Lite Micro)
-   Personalized baseline · Fusion classifier · Explainability · Forecasting
-        |
- Decision & Control Logic
-   Closed-loop irrigation trigger = stress classification + soil moisture + forecast
-        |
-   +----------------+------------------+
-   |                |                  |
-Local Output    Actuation        Remote Output
-OLED + buzzer   Relay->Pump->Tube  BLE/Wi-Fi -> Dashboard
-                -> Plant
-```
-
-Full diagrams (master hardware view, phase-by-phase wiring, software data flow) are in [`docs/PhytoSense_Connection_Diagrams.docx`](./docs).
-
-## Hardware
-
-**Compute:** ESP32-S3 (N8R8 PSRAM) — central compute, running inference and control logic
-**Secondary:** ESP32 (38-pin) — early bring-up / dev board
-
-| Subsystem             | Components                                                                                |
-| --------------------- | ----------------------------------------------------------------------------------------- |
-| Bioelectric sensing   | AD8232 amplifier, Ag/AgCl electrode discs, ADS1115 16-bit ADC                             |
-| Environmental sensing | BME280 (temp/humidity), BH1750 (light), capacitive soil moisture sensor                   |
-| Irrigation actuation  | 1-channel 5V relay, 6V DC water pump, 1m tube                                             |
-| Local I/O             | 0.96" OLED display, 5V buzzer                                                             |
-| Power                 | 6V 100mA solar panel, TP4056 USB-C charger, 3800mAh Li-ion battery, LM2596 buck converter |
-| Prototyping           | MB102 breadboard, dot PCB (6×4cm), jumper wires                                           |
-
-Full BOM with sourcing notes: [`docs/PhytoSense_Execution_Plan.docx`](./docs)
-Full pin-level connection table: [`docs/PhytoSense_Connection_Diagrams.docx`](./docs)
-
-### Key pin map (ESP32-S3)
-
-| Pin   | Connects to                             | Type        |
-| ----- | --------------------------------------- | ----------- |
-| GPIO8 | I2C SDA — ADS1115, BME280, BH1750, OLED | I2C         |
-| GPIO9 | I2C SCL — ADS1115, BME280, BH1750, OLED | I2C         |
-| GPIO4 | AD8232 LO+ (leads-off detect)           | Digital in  |
-| GPIO5 | AD8232 LO- (leads-off detect)           | Digital in  |
-| GPIO6 | Relay IN (irrigation control)           | Digital out |
-| GPIO7 | Buzzer +                                | Digital out |
-
-> ⚠️ Confirm these against your specific board's silkscreen before wiring — some ESP32-S3 breakouts remap GPIOs, and GPIO8/9 can be reserved for onboard flash on certain variants.
-
-## Software Stack
-
-| Layer             | Tools                                                                                                   |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| Firmware          | PlatformIO (VS Code) / ESP-IDF, Arduino libraries (Adafruit BME280, ADS1X15, U8g2/SSD1306, ArduinoJson) |
-| On-device ML      | TensorFlow Lite Micro + ESP-NN                                                                          |
-| Model prototyping | Python, scikit-learn / TensorFlow, XGBoost                                                              |
-| Explainability    | Permutation-importance / decision-path attribution                                                      |
-| Data & dashboard  | SD/SPIFFS or Firebase/ThingSpeak, BLE/Wi-Fi companion app                                               |
-| Analysis          | Python (pandas, matplotlib)                                                                             |
-| Design            | KiCad (schematic/PCB), Fritzing (breadboard docs), draw.io/Figma (diagrams)                             |
-| Simulation        | [Wokwi](https://wokwi.com) — ESP32-S3, I2C bus, and relay logic verified pre-hardware                   |
-
-## Repository Structure
+## 3. System overview
 
 ```
-phytosense-plus-plus/
-├── firmware/     PlatformIO project — one module per sensor
-├── hardware/     Schematics, wiring diagrams, BOM.csv, KiCad files
-├── data/         Logged sensor readings, by test date and plant group
-├── analysis/     Python scripts/notebooks generating paper figures
-├── dashboard/    BLE/Wi-Fi companion app (mobile/web)
-├── docs/         Execution plan, connection diagrams, replication guide, drafts
-├── .gitignore
-└── README.md
+AD8232 + Ag/AgCl electrodes ──► ESP32-S3 ADC (GPIO2) ──┐
+DHT11 (GPIO15), BMP280 (I2C 0x76/0x77) ────────────────┤
+Leads-off pins LO+ (GPIO4) / LO- (GPIO5) ──────────────┤
+                                                       ▼
+        Signal-quality gate ──► bounded-memory baseline (ring buffer) ──► z-score
+                                                       │
+                              persistence rule (10 consecutive samples)
+                                                       ▼
+                    status: cold_start | low_confidence | ok | deviation
+                                                       ▼
+                         microSD CSV log (CS = GPIO10) · serial · buzzer (optional)
 ```
 
-## Getting Started
+**Core idea:** the gate decides whether a sample may be trusted at all, so bad electrode contact or a railed front-end cannot corrupt the learned baseline or trigger false stress alerts.
 
-```bash
-git clone <this-repo-url>
-cd phytosense-plus-plus
+### Pin map (as used in firmware)
+
+| Pin           | Function                          |
+| ------------- | --------------------------------- |
+| GPIO2         | AD8232 output (bioelectric)       |
+| GPIO1         | Soil sensor input (not validated) |
+| GPIO4 / GPIO5 | AD8232 LO+ / LO- (leads-off)      |
+| GPIO8 / GPIO9 | I2C SDA / SCL (BMP280)            |
+| GPIO15        | DHT11                             |
+| GPIO10        | microSD chip-select               |
+| GPIO6         | Relay IN (driver present, unused) |
+| GPIO7         | Buzzer (disabled by default)      |
+
+> Confirm the board variant: PlatformIO resolves the board to **ESP32-S3-DevKitC-1-N8 (8 MB flash, no PSRAM)**, while older notes mention N8R8 / N16R8. Check the chip label and keep `platformio.ini` consistent with it.
+
+## 4. Repository structure
+
+```
+firmware/    PlatformIO project (main loop, SD logger, buzzer, relay driver)
+analysis/    replay_eval, reliability_report, event_eval, alarm_tuning, window_sweep, ...
+dashboard/   Streamlit replay dashboard (app.py + engine.py)
+data/        Logged recordings (CSV)
+docs/        Execution plan, connection diagrams, master document
+hardware/    Circuit diagrams and wiring images (add exported diagrams here)
+sim/         Wokwi sketch
+out/         Generated results (git-ignored)
 ```
 
-**Firmware:**
+## 5. How to run
+
+**Firmware**
 
 ```bash
 cd firmware
-pio run              # build
-pio run -t upload    # flash to ESP32-S3
-pio device monitor    # serial output
+pio run                 # build only
+pio run -t upload       # flash to ESP32-S3 (needs the board connected)
+pio device monitor      # serial output at 115200
 ```
 
-**Before touching real hardware:** simulate the I2C bus and relay logic in [Wokwi](https://wokwi.com) — see the verification checklist in `docs/`.
+**Analyses** (from the repo root; need `pandas numpy matplotlib`)
 
-## Build & Verification Workflow
+```bash
+python analysis/reliability_report.py   # uptime, gaps, reboots, usable-signal per day
+python analysis/event_eval.py           # plots around the leaf-cut events
+python analysis/alarm_tuning.py         # false alarms vs catch rate, threshold x persistence
+python analysis/window_sweep.py         # baseline window size vs memory and accuracy
+```
 
-Recommended order, to catch mistakes before they're physical:
+**Dashboard**
 
-1. **Wokwi** — simulate firmware logic (I2C addressing, relay trigger conditions)
-2. **Breadboard** — wire against `docs/PhytoSense_Connection_Diagrams.docx`, verify power rail with a multimeter before connecting sensors
-3. **Fritzing** — produce clean documentation once the design is locked
-4. **KiCad** — final schematic + PCB layout for the soldered build
+```bash
+python -m pip install -r dashboard/requirements.txt
+python -m streamlit run dashboard/app.py
+```
 
-## Project Roadmap
+Demo moves: pick the _Oct 13-14 railed front-end_ dataset to see the gate reject 83% of samples; on _v7 trial_ inject a **railed** fault (rejected, no alert) and a **step +6 SD** (alert after about 10 samples).
 
-| Phase | Focus                                                                                   |
-| ----- | --------------------------------------------------------------------------------------- |
-| 1     | Design finalization, BOM ordering, literature grounding                                 |
-| 2     | Analog front-end bring-up (AD8232 + ADS1115), invention disclosure drafted              |
-| 3     | Sensor + irrigation deployment across 3 plant test groups, **provisional patent filed** |
-| 4     | Software pipeline: fusion classifier, explainability, forecasting                       |
-| 5     | Full integration, dashboard, PCB, paper submission, repo made public                    |
+## 6. Data
 
-Full timeline: [`docs/PhytoSense_Execution_Plan.docx`](./docs)
+| File                            | Content                                                                            |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| `data/phytosense_trial_log.csv` | Main log; early firmware, includes a railed front-end period; only ~16 h are clean |
+| `data/trial_v7.csv`             | 2.7 h run on firmware v7                                                           |
+| `data/preflight_90min.csv`      | 2.6 h preflight run                                                                |
 
-## Documentation
+The main log spans several recording days (not continuous weeks). Early rows contain implausible temperature and pressure values from an earlier sensor fault; the analyses exclude them.
 
-- [`docs/PhytoSense_Execution_Plan.docx`](./docs) — complete build/patent/paper execution plan
-- [`docs/PhytoSense_Connection_Diagrams.docx`](./docs) — pin diagrams, wiring, software architecture
-- Team task board, work log, patent contribution log, decisions log — tracked outside git (see team spreadsheet)
+## 7. Limitations (please read)
 
-## Team
+- **Stress detection on real plants is not yet validated.** The leaf-cut on 18 Oct was done before logging resumed, so there is no pre-event baseline; the 12 Sep event shows no clear transient in noisy data. A properly logged repeat (≥ 1 h before, ≥ 1 h after, noted timestamp) is the main open experiment.
+- **The soil channel is unreliable.** It reads about 85 / 4095 and tracks the bioelectric channel; it is excluded from all results and from the dashboard.
+- **Closed-loop irrigation is not implemented in the main loop.** Only the relay driver exists.
+- Persistence rule: not yet flashed to or tested on the device.
+- Thresholds were tuned and evaluated on the same recordings; a held-out split is future work.
+- Clean data totals about 21 h; results are preliminary.
 
-Three-person team, VIT Chennai, Embedded Systems course project — faculty-supported. Work is shared across all members rather than fixed hardware/software roles; see the Patent Contribution Log for per-idea attribution.
+## 8. Future work
 
-## IP Status & Publication Timeline
+Closed-loop irrigation driven by a validated soil sensor; on-device explainability (which feature drove the alert); short-horizon forecasting; a repeated, labelled leaf-damage and drought experiment with latency measurements; power-consumption measurement and battery-life estimate; held-out evaluation and comparison against Hampel, EWMA and median/MAD detectors.
 
-**Provisional patent filing in progress.**
+## 9. Documentation
 
-- This repository must remain **private** until the provisional patent application has been filed.
-- The associated research paper must not be submitted to any venue before filing, for the same reason.
-- Once the provisional is filed, the repository may be made public and the paper submitted, per the team's execution plan.
-- See `docs/PhytoSense_Execution_Plan.docx` for the full patent and paper filing timeline, and the team's Patent Contribution Log for per-idea inventorship records.
+- `docs/PhytoSense_Execution_Plan_REVISED.docx` — build, patent and paper plan
+- `docs/PhytoSense_Connection_Diagrams.docx` — pin diagrams and wiring
+- `docs/PhytoSense_Master_Document_REVISED.docx` — master reference
+
+## 10. Team
+
+Three-person team, VIT Chennai, Embedded Systems course project, faculty-supported. Work is shared across members; per-idea attribution is kept in the team's Patent Contribution Log.
+
+## IP status
+
+**Provisional patent filing in progress.** The repository must stay private, and the associated paper must not be submitted to any venue, until the provisional application has been filed. See the Execution Plan for the timeline.
 
 ## License
 
-**TBD** — to be decided _after_ the provisional patent is filed, since licensing terms interact with IP rights. Do not add a license file before that point.
+**TBD** — to be decided after the provisional patent is filed. Do not add a license file before then.
