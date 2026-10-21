@@ -92,7 +92,7 @@ for _ in range(4):
 r,dg,du,sg,su=run(x); c=r!="none"
 L.append("[C] INJECTED FAULTS (SIMULATED: 6 rail episodes, 12 spikes, 4 offset steps)")
 L.append(f" caught {c[lab].mean()*100:.1f}%  clean wrongly rejected {c[~lab].mean()*100:.2f}%  alarms gated={dg.sum()} ungated={du.sum()}")
-L.append(f" memory: ring = {N} floats ({N*4/1024:.1f} KB), constant regardless of run length")
+L.append(f" memory: ring = {N} floats ({N*4:,} B), constant regardless of run length")
 
 txt="\n".join(L); print(txt)
 out=sys.argv[2] if len(sys.argv)>2 else "."

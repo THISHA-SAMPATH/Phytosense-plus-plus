@@ -268,5 +268,5 @@ with tab_an:
         ev = r[r["alert"] & ~r["alert"].shift(1, fill_value=False)][["t", "bio", "z"]].copy()
         ev[["bio", "z"]] = ev[["bio", "z"]].round(1)
         st.dataframe(ev.tail(50), hide_index=True, use_container_width=True)
-    st.caption(f"Baseline memory: {engine.BASELINE_N} float32 samples = {engine.BASELINE_N * 4 / 1024:.1f} KB, constant regardless of run length. "
+    st.caption(f"Baseline memory: {engine.BASELINE_N} float32 samples = {engine.BASELINE_N * 4:,} B, constant regardless of run length. "
                "Firmware build: RAM 27,500 B (8.4%), Flash 362,893 B (10.9%) on ESP32-S3.")

@@ -1,4 +1,4 @@
-// PhytoSense++ — Wokwi simulation starter sketch
+// PhytoSense++ — Wokwi PRE-HARDWARE starter simulation (not the final firmware; see sim/README.md)
 // Matches diagram.json wiring exactly.
 
 #include <Wire.h>
@@ -19,8 +19,8 @@
 DHT dht(DHT_PIN, DHT_TYPE);
 
 // ---- Analog stub pins (potentiometers standing in for real sensors) ----
-#define AD8232_STUB_PIN 1   // stub for AD8232 output -> normally ADS1115 A0
-#define SOIL_STUB_PIN   2   // stub for capacitive soil sensor -> normally ADS1115 A1
+#define AD8232_STUB_PIN 2   // stub for AD8232 output (same pin as firmware ECG_PIN, GPIO2)
+#define SOIL_STUB_PIN   1   // stub for soil sensor (same pin as firmware SOIL_PIN, GPIO1; not validated)
 #define BH1750_STUB_PIN 3   // stub for BH1750 light sensor (not in Wokwi library)
 
 // ---- AD8232 leads-off digital stubs ----
@@ -82,8 +82,8 @@ void loop() {
   float dhtTemp = dht.readTemperature();
 
   // --- Stubbed sensors (potentiometers standing in for real hardware) ---
-  int ad8232_raw = analogRead(AD8232_STUB_PIN);   // TODO: replace with ADS1115 A0 on real hardware
-  int soil_raw   = analogRead(SOIL_STUB_PIN);     // TODO: replace with ADS1115 A1 on real hardware
+  int ad8232_raw = analogRead(AD8232_STUB_PIN);   // real firmware reads this pin directly (GPIO2), no ADS1115
+  int soil_raw   = analogRead(SOIL_STUB_PIN);     // real firmware reads this pin directly (GPIO1), no ADS1115
   int light_raw  = analogRead(BH1750_STUB_PIN);   // TODO: replace with real BH1750 I2C reading
 
   bool leadsOffPlus  = digitalRead(LO_PLUS_PIN);

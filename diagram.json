@@ -42,11 +42,11 @@
 
     [ "pot_ad8232_stub:VCC", "esp32:3V3", "red", [] ],
     [ "pot_ad8232_stub:GND", "esp32:GND.1", "black", [] ],
-    [ "pot_ad8232_stub:SIG", "esp32:1", "orange", [] ],
+    [ "pot_ad8232_stub:SIG", "esp32:2", "orange", [] ],
 
     [ "pot_soil_stub:VCC", "esp32:3V3", "red", [] ],
     [ "pot_soil_stub:GND", "esp32:GND.1", "black", [] ],
-    [ "pot_soil_stub:SIG", "esp32:2", "orange", [] ],
+    [ "pot_soil_stub:SIG", "esp32:1", "orange", [] ],
 
     [ "dht22_1:VCC", "esp32:3V3", "red", [] ],
     [ "dht22_1:GND", "esp32:GND.2", "black", [] ],
