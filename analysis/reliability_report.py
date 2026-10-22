@@ -11,7 +11,7 @@ RAIL = 4090
 def report(path):
     d = pd.read_csv(path)
     d["t"] = pd.to_datetime(d["wall_clock_time"], format="mixed")
-    d = d.sort_values("t").reset_index(drop=True)
+    d = d.sort_values("t", kind="stable").reset_index(drop=True)
     dt = d["t"].diff().dt.total_seconds().dropna()
     span_h = (d["t"].iloc[-1] - d["t"].iloc[0]).total_seconds() / 3600
     gaps = dt[dt > GAP_S]

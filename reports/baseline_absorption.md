@@ -1,0 +1,7 @@
+# Baseline absorption: derivation and simulation
+
+For a full rolling arithmetic-mean buffer of N old observations at level μ, after k persistent step observations at μ+δ replace old values, the mean is μ_k=μ+(k/N)δ for 0≤k≤N. The remaining signal-to-mean difference is |δ|−(k/N)|δ|=|δ|(1−k/N). For a fixed threshold zσ, absorption at or below threshold occurs when |δ|(1−k/N)≤zσ, hence k≥N(1−zσ/|δ|); the first integer is ceil(max(0,N(1−zσ/|δ|))). For strict-below, the first integer is floor(max(0,N(1−zσ/|δ|)))+1. The detector uses strict `>` so equality is not alarm.
+
+The repository firmware baseline is an arithmetic rolling mean and sample SD over 1800 values, but its scale is adaptive, scores before pushing, uses gating, and persistence=10. The equation describes mean displacement only under fixed σ and uninterrupted valid samples. It does not predict alarm clearing when sample variance changes. It also does not apply to robust median/MAD models; this implementation is not median/MAD.
+
+`window_sweep.csv` is a deterministic software simulation over sample-count windows (300, 600, 900, 1800), shifts (3/4/6 σ), fixed noise (σ=1/2), thresholds (2.5/3), persistence (5/10), and update/freeze policies. No irregular timestamps or firmware gates are simulated here; sample counts equal seconds only under the explicit 1 Hz synthetic assumption. Synthetic results are methodological illustrations, not plant-stress evidence. The code currently measures mean displacement and threshold clearing separately; fixed-scale theory and adaptive-SD simulation need not match.

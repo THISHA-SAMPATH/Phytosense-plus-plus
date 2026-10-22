@@ -143,7 +143,10 @@ python analysis/tradeoff.py             # trade-off figure and drop-one-day sens
 python analysis/reliability_report.py   # uptime, gaps, reboots, usable-signal per day
 python analysis/alarm_tuning.py         # false alarms vs catch rate, threshold x persistence
 python analysis/window_sweep.py         # baseline window size vs memory and accuracy
+python analysis/run_revised_audit.py    # revised data audit, fault replay, gate ablation, simulation, focused tests
 ```
+
+The revised audit writes separate artifacts under `out/revised/` and `reports/`; it does not overwrite the original benchmark outputs. See `reports/final_research_report.md` for analyses that remain incomplete, including the elapsed-time rerun of the six-detector benchmark.
 
 **Dashboard**
 

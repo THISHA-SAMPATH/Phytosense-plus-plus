@@ -1,0 +1,22 @@
+"""Write reproducibility and source-data audit without changing source data."""
+import subprocess, sys, importlib.metadata as md
+import pandas as pd, numpy as np
+try:
+    from .research_common import ROOT, FILES, OUT, REPORTS, load, prepare_dirs
+except ImportError:
+    from research_common import ROOT, FILES, OUT, REPORTS, load, prepare_dirs
+
+def main():
+    prepare_dirs(); rows=[]; sections=[]
+    try: revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    except Exception: revision='unavailable'
+    for path in FILES:
+        raw=pd.read_csv(path,low_memory=False); d=load(path); delta=d.t.diff().dt.total_seconds(); x=d.bioelectric_raw
+        row=dict(file=str(path.relative_to(ROOT)),raw_rows=len(raw),unique_timestamps=len(d),duplicates=len(raw)-len(d),start=str(d.t.min()),end=str(d.t.max()),timezone='naive/unspecified',n_gt10s=int((delta>10).sum()),max_gap_s=float(delta.max()),rail_hi=int((x>=4090).sum()),rail_lo=int((x<=50).sum()),invalid_bio=int((~np.isfinite(x)).sum()),missing_values=int(raw.isna().sum().sum()),columns='|'.join(raw.columns))
+        rows.append(row)
+        sections.append(f"### `{path.name}`\n\n- Rows: {len(raw):,}; unique timestamps: {len(d):,}; duplicate rows: {len(raw)-len(d):,}.\n- Timestamp range: {d.t.min()} to {d.t.max()} (timezone absent; interpreted as naive wall clock).\n- Gaps >10 s: {int((delta>10).sum()):,}; maximum gap: {delta.max():,.3f} s.\n- Rail-valued average readings: high={int((x>=4090).sum()):,}, low={int((x<=50).sum()):,}; invalid bioelectric values={int((~np.isfinite(x)).sum())}.\n- Columns: `{', '.join(raw.columns)}`.\n")
+    pd.DataFrame(rows).to_csv(OUT/'data_quality.csv',index=False)
+    deps={k:(md.version(k) if any(x.metadata['Name'].lower()==k.lower() for x in md.distributions()) else 'not installed') for k in ['numpy','pandas','matplotlib','pytest']}
+    text=f'''# Repository and reproducibility audit\n\n- Revision: `{revision}`\n- Python: `{sys.version.split()[0]}`\n- Dependencies: {deps}\n- Git status at audit start: branch `main`, one pre-existing modified file `analysis/reliability_report.py`; retained untouched.\n- Original outputs in `out/`: `bench_summary.csv`, `bench_folds.csv`, `bench_cost.csv`, `bench_events.csv`, `bench_fa.csv`, `reliability_report.txt`; timestamps/provenance not embedded, so source/config revision for those generated files is unknown. Frozen paper outputs also exist under `paper/data/`.\n- Benchmark original configuration: GAP_S=10, SKIP_S=1800 rows (despite `_S` naming), MIN_GOOD_H=1, BASE_N=1800 sample rows, MIN_N=200 sample rows, Z=3, persistence=10 good rows, reset=900 rows for most alternatives, guard=120 rows; events injected at row indices, not true elapsed time.\n- Duplicate policy in revised work: sort chronologically, coalesce same timestamp using median numeric values and max leads-off/saturation counts. Gaps remain gaps; no interpolation.\n- Full field-level quality summary is in `out/revised/data_quality.csv`.\n\n## Input files\n\n{chr(10).join(sections)}\n## Firmware and evidence limits\n\n`firmware/src/main.cpp` reads each cycle as 20 ADC samples, stores their average, tracks min/max/count at saturation, then applies five gate checks: leads-off/contact, high rail, low rail, 60-second flatline SD, and one-sample jump. Gate priority is contact > high rail > low rail > flat > jump. The ring baseline stores 1800 good values, computes arithmetic mean and sample SD by rescanning, becomes scoreable after 200 values, scores before update, and emits deviation after 10 consecutive |z|>3 good cycles. 600 consecutive bad cycles clear only baseline count/head.\n\nThe main historical CSV does not have `bio_min`, `bio_max`, or `n_sat`; only later log schemas do. Consequently exact high-rail detection and reconstruction of raw oversampling are not available for the full rail log. Timestamp strings have no timezone suffix; UTC/local cannot be inferred. Nominal interval is approximately 1 second in some sessions, but the overall data contain duplicates, irregular intervals, and multi-day gaps. Existing benchmark treats `SKIP_S`, `BASE_N`, and events as rows despite names/comments implying seconds. Its event score includes the guard as a hit and reports index latency; this requires repair before paper claims rely on it.\n'''
+    (REPORTS/'audit_report.md').write_text(text,encoding='utf-8')
+if __name__=='__main__':main()
