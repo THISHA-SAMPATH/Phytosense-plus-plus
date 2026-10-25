@@ -1,6 +1,24 @@
-detector,state_bytes,ops_per_sample
-firmware baseline,7200,"~3N = 5400 (sum and sum-of-squares recomputed each sample, as in main.cpp)"
-freeze-on-deviation,7220,"~15 (running sums, freeze counter)"
-winsorised update,7216,"~15 (running sums, two clips)"
-CUSUM,7228,"~15 (running sums, two accumulators)"
-Page-Hinkley,7236,"~15 (running sums, four accumulators)"
+family,setting,baseline_buffer_bytes,additional_state_bytes,logical_state_bytes,theoretical_ops_per_sample,python_runtime,firmware_runtime,cost_basis
+baseline,baseline,7200,8,7208,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+freeze,freeze,7200,12,7212,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+winsor,winsor,7200,8,7208,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+cusum,cusum(h=8),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+cusum,cusum(h=16),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+cusum,cusum(h=32),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+cusum,cusum(h=64),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+cusum,cusum(h=128),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+cusum,cusum(h=256),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+cusum,cusum(h=512),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+ph,ph(lam=10),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+ph,ph(lam=20),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+ph,ph(lam=40),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+ph,ph(lam=80),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+ph,ph(lam=160),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+ph,ph(lam=320),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+ph,ph(lam=640),7200,40,7240,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+stable,"stable(band=1.0,T=600)",7200,520,7720,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+stable,"stable(band=1.0,T=900)",7200,520,7720,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+stable,"stable(band=1.0,T=1800)",7200,520,7720,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+stable,"stable(band=2.0,T=600)",7200,520,7720,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+stable,"stable(band=2.0,T=900)",7200,520,7720,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim
+stable,"stable(band=2.0,T=1800)",7200,520,7720,not measured; inherited detector implementation,not measured,not measured,logical estimate only; includes 64-bit recent window for stable; no ESP32 timing claim

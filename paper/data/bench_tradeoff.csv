@@ -1,18 +1,24 @@
-setting,family,fa_per_h,sustained6_alerted_frac,sustained6_median_latency_s
-baseline,baseline,0.0786723602145133,0.12836842105263155,9.0
-cusum(h=512),cusum,0.7080512419306197,0.6159298245614035,82.0
-cusum(h=256),cusum,0.7237857139735224,0.6738245614035088,30.0
-cusum(h=128),cusum,1.117147515046089,0.7160000000000001,12.0
-cusum(h=64),cusum,1.6678540365476822,0.7349824561403507,5.0
-cusum(h=32),cusum,2.092684781706054,0.7464912280701755,2.0
-cusum(h=16),cusum,5.003562109643046,0.6967543859649121,1.0
-cusum(h=8),cusum,27.2049021621787,0.7152105263157894,0.0
-freeze,freeze,3.2255667687950456,0.7696842105263156,9.0
-ph(lam=640),ph,0.5035031053728851,0.5782807017543861,117.0
-ph(lam=320),ph,0.7552546580593278,0.6751754385964912,40.5
-ph(lam=160),ph,1.1958198752606022,0.7072807017543857,16.0
-ph(lam=80),ph,1.541978260204461,0.7288070175438598,7.0
-ph(lam=40),ph,1.7307919247192929,0.7455263157894736,3.0
-ph(lam=20),ph,2.879408383851187,0.6961228070175438,1.0
-ph(lam=10),ph,20.53348601598797,0.7099999999999999,0.0
-winsor,winsor,0.14161024838612396,0.4466842105263157,9.0
+family,setting,mean_detection_across_8_synthetic_strata,clean_alarm_episodes,eligible_clean_hours,episodes_per_hour,interpretation
+baseline,baseline,0.326317606468,5,64.4254497222,0.0776090818389,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+freeze,freeze,0.503521751961,136,64.4254497222,2.11096702602,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+winsor,winsor,0.335891952359,9,64.4254497222,0.13969634731,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+cusum,cusum(h=8),0.806803657572,942,64.4254497222,14.6215510184,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+cusum,cusum(h=16),0.786856163063,188,64.4254497222,2.91810147714,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+cusum,cusum(h=32),0.755579663679,115,64.4254497222,1.78500888229,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+cusum,cusum(h=64),0.723859215886,83,64.4254497222,1.28831075853,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+cusum,cusum(h=128),0.670512914549,60,64.4254497222,0.931308982067,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+cusum,cusum(h=256),0.596044522619,42,64.4254497222,0.651916287447,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+cusum,cusum(h=512),0.502842244426,41,64.4254497222,0.636394471079,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+ph,ph(lam=10),0.79371311765,809,64.4254497222,12.5571494415,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+ph,ph(lam=20),0.781437194602,128,64.4254497222,1.98679249508,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+ph,ph(lam=40),0.734583928169,92,64.4254497222,1.42800710584,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+ph,ph(lam=80),0.704022018461,79,64.4254497222,1.22622349305,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+ph,ph(lam=160),0.659694613004,64,64.4254497222,0.993396247538,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+ph,ph(lam=320),0.554398851267,42,64.4254497222,0.651916287447,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+ph,ph(lam=640),0.4426852961,31,64.4254497222,0.481176307401,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+stable,"stable(band=1.0,T=600)",0.365744465619,5,64.4254497222,0.0776090818389,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+stable,"stable(band=1.0,T=900)",0.365744465619,5,64.4254497222,0.0776090818389,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+stable,"stable(band=1.0,T=1800)",0.398781899534,5,64.4254497222,0.0776090818389,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+stable,"stable(band=2.0,T=600)",0.365744465619,5,64.4254497222,0.0776090818389,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+stable,"stable(band=2.0,T=900)",0.365744465619,5,64.4254497222,0.0776090818389,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
+stable,"stable(band=2.0,T=1800)",0.396001031903,5,64.4254497222,0.0776090818389,descriptive fixed-configuration replay; adaptive configurations are selected on training folds
